@@ -1,0 +1,6 @@
+name: basic_tools
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - coreutils

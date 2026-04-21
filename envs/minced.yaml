@@ -1,0 +1,6 @@
+name: minced
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - minced

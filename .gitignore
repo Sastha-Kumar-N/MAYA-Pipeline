@@ -1,0 +1,12 @@
+results/
+*.zip
+data/
+databases/
+logs/
+kofam_db/
+busco_downloads/
+*.tar.gz
+*.html
+*.json
+tmp/
+*.tar.gz*

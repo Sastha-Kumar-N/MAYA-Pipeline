@@ -1,0 +1,11 @@
+name: kofamscan_env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  - kofamscan
+  - hmmer
+  - perl
+  - ruby=2.7

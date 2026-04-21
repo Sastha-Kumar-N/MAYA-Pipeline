@@ -1,0 +1,11 @@
+name: busco
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - busco
+  - augustus
+  - hmmer
+  - blast
+  - prodigal

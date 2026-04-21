@@ -1,0 +1,9 @@
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  - perl>=5.32
+  - mlst=2.23.0
+  - blast=2.14.0

@@ -1,0 +1,9 @@
+name: antismash
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  - python=3.11
+  - antismash=8.0.4

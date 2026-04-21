@@ -1,0 +1,7 @@
+samples:
+  vibrio:
+    R1: data/ERR3771946_1.fastq.gz
+    R2: data/ERR3771946_2.fastq.gz
+
+outdir: results
+threads: 4
