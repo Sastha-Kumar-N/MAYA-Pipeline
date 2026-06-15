@@ -1,26 +1,6 @@
 
-############################################
-# SAMPLES
-############################################
-import os
-
-def get_input(sample):
-    if os.path.exists(f"data/{sample}_1.fastq.gz"):
-        return {
-            "type": "fastq",
-            "r1": f"data/{sample}_1.fastq.gz",
-            "r2": f"data/{sample}_2.fastq.gz"
-        }
-    elif os.path.exists(f"data/{sample}.fasta"):
-        return {
-            "type": "fasta",
-            "fasta": f"data/{sample}.fasta"
-        }
-    else:
-        raise ValueError(f"No input found for {sample}")
-
-FASTQ_SAMPLES = ["ERR3771946"]
-FASTA_SAMPLES = ["Bsubtilis"]
+FASTQ_SAMPLES = ["proteusvulgaris"]
+FASTA_SAMPLES = ["staphO"]
 SAMPLES = FASTQ_SAMPLES + FASTA_SAMPLES
 ############################################
 # RULE ALL
@@ -29,16 +9,17 @@ SAMPLES = FASTQ_SAMPLES + FASTA_SAMPLES
 rule all:
     input:
         # FASTQ only
-        expand("results/fastp/{sample}_1.trim.fastq.gz", sample=FASTQ_SAMPLES),
-        expand("results/fastp/{sample}_2.trim.fastq.gz", sample=FASTQ_SAMPLES),
-        expand("results/spades/{sample}/contigs.fasta", sample=FASTQ_SAMPLES),
-        expand("results/fastqc_trimmed/{sample}_1.trim_fastqc.html", sample=FASTQ_SAMPLES),
-        expand("results/fastqc_trimmed/{sample}_2.trim_fastqc.html", sample=FASTQ_SAMPLES),
+        *(expand("results/fastp/{sample}_1.trim.fastq.gz", sample=FASTQ_SAMPLES) if FASTQ_SAMPLES else []),
+        *(expand("results/fastp/{sample}_2.trim.fastq.gz", sample=FASTQ_SAMPLES) if FASTQ_SAMPLES else []),
+         expand("results/spades/{sample}/contigs.fasta", sample=FASTQ_SAMPLES),
+         expand("results/spades/{sample}/contigs.fasta", sample=FASTA_SAMPLES),
+        *(expand("results/fastqc_trimmed/{sample}_1.trim_fastqc.html", sample=FASTQ_SAMPLES) if FASTQ_SAMPLES else []),
+        *(expand("results/fastqc_trimmed/{sample}_2.trim_fastqc.html", sample=FASTQ_SAMPLES) if FASTQ_SAMPLES else []),
 
         # BOTH
         expand("results/prokka/{sample}/{sample}.gff", sample=SAMPLES),
         "results/multiqc/multiqc_report.html",
-        expand("results/jellyfish/{sample}_histo.txt", sample=SAMPLES),
+        expand("results/jellyfish/{sample}_histo.txt", sample=FASTQ_SAMPLES),
         expand("results/abricate/{sample}/{sample}.tab", sample=SAMPLES),
         expand("results/mlst/{sample}/{sample}.tsv", sample=SAMPLES),
         expand("results/diamond/{sample}.tsv", sample=SAMPLES),
@@ -55,25 +36,32 @@ rule all:
 # FASTP
 ############################################
 rule fastp:
+    wildcard_constraints:
+        sample="|".join(FASTQ_SAMPLES)
+
+    input:
+        r1="data/{sample}_1.fastq.gz",
+        r2="data/{sample}_2.fastq.gz"
+
     output:
         r1="results/fastp/{sample}_1.trim.fastq.gz",
         r2="results/fastp/{sample}_2.trim.fastq.gz"
+
     conda:
         "envs/fastp.yaml"
-    threads: 2
-    wildcard_constraints:
-        sample="|".join(FASTQ_SAMPLES)
-    run:
-        inp = get_input(wildcards.sample)
 
-        shell(f"""
+    threads: 2
+
+    shell:
+        """
         mkdir -p results/fastp
+
         fastp \
-            -i {inp["r1"]} \
-            -I {inp["r2"]} \
+            -i {input.r1} \
+            -I {input.r2} \
             -o {output.r1} \
             -O {output.r2}
-        """)
+        """
 ############################################
 # FASTQC
 ############################################
@@ -98,8 +86,8 @@ rule fastqc_trimmed:
 ############################################
 rule multiqc:
     input:
-        expand("results/fastqc_trimmed/{sample}_1.trim_fastqc.html", sample=SAMPLES),
-        expand("results/fastqc_trimmed/{sample}_2.trim_fastqc.html", sample=SAMPLES)
+        expand("results/fastqc_trimmed/{sample}_1.trim_fastqc.html", sample=FASTQ_SAMPLES),
+        expand("results/fastqc_trimmed/{sample}_2.trim_fastqc.html", sample=FASTQ_SAMPLES),
     output:
         "results/multiqc/multiqc_report.html"
     conda:
@@ -109,32 +97,54 @@ rule multiqc:
         mkdir -p results/multiqc
         multiqc results/fastqc_trimmed -o results/multiqc --force
         """
-############################################
-# SPADES
-############################################
-rule spades:
-    input: []
+####################################
+# SPADES FOR FASTQ
+####################################
+
+rule spades_fastq:
+    input:
+        r1="results/fastp/{sample}_1.trim.fastq.gz",
+        r2="results/fastp/{sample}_2.trim.fastq.gz"
+
     output:
         "results/spades/{sample}/contigs.fasta"
+
     conda:
         "envs/spades.yaml"
-    threads: 4
-    run:
-        inp = get_input(wildcards.sample)
 
-        if inp["type"] == "fastq":
-            shell(f"""
-                mkdir -p results/spades/{wildcards.sample}
-                spades.py \
-                    -1 {inp["r1"]} \
-                    -2 {inp["r2"]} \
-                    -o results/spades/{wildcards.sample}
-            """)
-        else:
-            shell(f"""
-                mkdir -p results/spades/{wildcards.sample}
-                cp {inp["fasta"]} {output}
-            """)
+    threads: 4
+
+    shell:
+        """
+        mkdir -p results/spades/{wildcards.sample}
+
+        spades.py --careful \
+            -1 {input.r1} \
+            -2 {input.r2} \
+            -o results/spades/{wildcards.sample}
+        """
+
+
+####################################
+# FASTA INPUT
+####################################
+
+rule fasta_copy:
+    input:
+        "data/{sample}.fasta"
+
+    output:
+        "results/spades/{sample}/contigs.fasta"
+
+    shell:
+        """
+        mkdir -p results/spades/{wildcards.sample}
+
+        cp {input} {output}
+        """
+        
+           
+       
 ############################################
 # QUAST
 ############################################
@@ -321,6 +331,8 @@ rule antismash:
             --output-dir {output} \
             {input}
         """
+
+
 ############################################
 # BUSCO
 ############################################
@@ -406,20 +418,28 @@ rule trf:
 ############################################
 # JELLYFISH
 ############################################
-
 rule jellyfish:
+    wildcard_constraints:
+        sample="|".join(FASTQ_SAMPLES)
+
     input:
         r1="results/fastp/{sample}_1.trim.fastq.gz",
         r2="results/fastp/{sample}_2.trim.fastq.gz"
+
     output:
         "results/jellyfish/{sample}_histo.txt"
+
     conda:
         "envs/jellyfish.yaml"
+
     shell:
         """
         mkdir -p results/jellyfish
-        jellyfish count -m 21 -s 100M -t 2 \
-            <(zcat {input.r1}) <(zcat {input.r2}) -o jf.tmp
-        jellyfish histo jf.tmp > {output}
-        rm jf.tmp
+
+        jellyfish count -m 21 -s 100M -t 2 -C \
+            <(zcat {input.r1}) <(zcat {input.r2}) \
+            -o results/jellyfish/{wildcards.sample}.jf
+
+        jellyfish histo results/jellyfish/{wildcards.sample}.jf \
+            > {output}
         """

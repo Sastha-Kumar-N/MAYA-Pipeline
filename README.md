@@ -17,10 +17,8 @@ HMMER
 antiSMASH
 BUSCO
 tRNAscan-SE
-MinCED
 Barrnap
 TRF
-IslandPath
 Jellyfish
 CheckM
 
